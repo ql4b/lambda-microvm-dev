@@ -123,6 +123,18 @@ state: require-id
 	@aws lambda-microvms get-microvm \
 	  --microvm-identifier "$$(cat $(ID_FILE))" | jq
 
+## suspend: suspend the tracked MicroVM (RUNNING -> SUSPENDED)
+.PHONY: suspend
+suspend: require-id
+	@aws lambda-microvms suspend-microvm \
+	  --microvm-identifier "$$(cat $(ID_FILE))" | jq
+
+## resume: resume the tracked MicroVM (SUSPENDED -> RUNNING)
+.PHONY: resume
+resume: require-id
+	@aws lambda-microvms resume-microvm \
+	  --microvm-identifier "$$(cat $(ID_FILE))" | jq
+
 ## token: mint an auth token (TOKEN_MINUTES, default 30); prints the token
 .PHONY: token
 token: require-id
