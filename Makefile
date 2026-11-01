@@ -121,7 +121,7 @@ call: require-id
 	  --expiration-in-minutes 5 \
 	  --allowed-ports '[{"allPorts":{}}]' \
 	  | jq -r '.authToken."X-aws-proxy-auth"'); \
-	echo "GET https://$$endpoint/"; \
+	echo "GET https://$$endpoint/" >&2; \
 	curl -sS -H "X-aws-proxy-auth: $$token" "https://$$endpoint/"; \
 	echo
 
