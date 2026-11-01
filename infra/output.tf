@@ -59,3 +59,17 @@ output "microvm_image" {
 output "microvm_image_arn" {
   value = aws_lambdamicrovms_image.app.arn
 }
+
+# Pieces needed to re-submit the image via `update-microvm-image` (PUT
+# semantics) when enabling hooks out-of-band — see `make hooks-enable`.
+output "microvm_base_image_arn" {
+  value = aws_lambdamicrovms_image.app.base_image_arn
+}
+
+output "microvm_code_uri" {
+  value = one(aws_lambdamicrovms_image.app.code_artifact[*].uri)
+}
+
+output "build_role_arn" {
+  value = module.lambda_role.arn
+}

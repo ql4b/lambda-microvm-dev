@@ -32,6 +32,14 @@ TOKEN_MINUTES ?= 30
 # Default state filter for `make list` (RUNNING; use STATE=ALL for everything).
 STATE ?= RUNNING
 
+# Lifecycle hooks config for `make hooks-enable` (port the app's hook server
+# listens on + which hooks to enable). Override wholesale with HOOKS='{...}'.
+HOOK_PORT ?= 9000
+HOOKS ?= {"port":$(HOOK_PORT),"microvmImageHooks":{"ready":"ENABLED","readyTimeoutInSeconds":30},"microvmHooks":{"run":"ENABLED","runTimeoutInSeconds":5,"resume":"ENABLED","resumeTimeoutInSeconds":5,"suspend":"ENABLED","suspendTimeoutInSeconds":5,"terminate":"ENABLED","terminateTimeoutInSeconds":5}}
+
+# Optional per-VM payload delivered to the /run hook (runHookPayload).
+RUN_PAYLOAD ?=
+
 # Runtime log group for the MicroVM's application stdout/stderr. Defaults to
 # /aws/lambda-microvms/<namespace>-<name>; override with LOG_GROUP=... .
 LOG_GROUP ?= /aws/lambda-microvms/$(NAMESPACE)-$(NAME)
@@ -78,6 +86,26 @@ image-info:
 logs:
 	aws logs tail $(LOG_GROUP) $(LOG_ARGS)
 
+## hooks-enable: enable lifecycle hooks on the image (out-of-band; builds a new version)
+# Re-submits the Terraform-managed image via update-microvm-image with --hooks.
+# NOTE: this mutates the image OUTSIDE Terraform — the next `make image`/apply
+# will overwrite the hooks config. For experimentation only.
+.PHONY: hooks-enable
+hooks-enable:
+	@set -e; \
+	img=$$($(TF) -chdir=$(INFRA_DIR) output -raw microvm_image_arn); \
+	base=$$($(TF) -chdir=$(INFRA_DIR) output -raw microvm_base_image_arn); \
+	uri=$$($(TF) -chdir=$(INFRA_DIR) output -raw microvm_code_uri); \
+	role=$$($(TF) -chdir=$(INFRA_DIR) output -raw build_role_arn); \
+	echo "Enabling hooks on $$img (new version build) ..." >&2; \
+	aws lambda-microvms update-microvm-image \
+	  --image-identifier "$$img" \
+	  --base-image-arn "$$base" \
+	  --build-role-arn "$$role" \
+	  --code-artifact "uri=$$uri" \
+	  --cpu-configurations '[{"architecture":"ARM_64"}]' \
+	  --hooks '$(HOOKS)' | jq
+
 # --- MicroVM lifecycle ------------------------------------------------------
 
 ## run: run a MicroVM from the current image; saves id + endpoint locally
@@ -117,6 +145,7 @@ run: require-region
 	  --ingress-network-connectors "$(INGRESS)" \
 	  --egress-network-connectors "$(EGRESS)" \
 	  --logging '$(LOGGING)' \
+	  $(if $(RUN_PAYLOAD),--run-hook-payload '$(RUN_PAYLOAD)',) \
 	  --idle-policy '$(IDLE_POLICY)'); \
 	echo "$$resp" | jq; \
 	echo "$$resp" | jq -r '.microvmId' > $(ID_FILE); \
