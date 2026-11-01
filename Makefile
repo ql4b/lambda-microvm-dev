@@ -78,6 +78,17 @@ logs:
 .PHONY: run
 run: require-region
 	@set -e; \
+	if [ -f $(ID_FILE) ] && [ -z "$(FORCE)" ]; then \
+	  existing=$$(cat $(ID_FILE)); \
+	  state=$$(aws lambda-microvms get-microvm --microvm-identifier "$$existing" \
+	    --query 'state' --output text 2>/dev/null || true); \
+	  case "$$state" in \
+	    ""|TERMINATED|TERMINATING) ;; \
+	    *) echo "A MicroVM is already tracked: $$existing ($$state)." >&2; \
+	       echo "  terminate it with 'make clean', or re-run with FORCE=1 to launch another." >&2; \
+	       exit 1 ;; \
+	  esac; \
+	fi; \
 	mkdir -p $(STATE_DIR); \
 	image_arn=$$($(TF) -chdir=$(INFRA_DIR) output -raw microvm_image_arn 2>/dev/null || true); \
 	test -n "$$image_arn" || { \
@@ -135,14 +146,25 @@ call: require-id
 	curl -sS -H "X-aws-proxy-auth: $$token" "https://$$endpoint/"; \
 	echo
 
-## clean: terminate the running MicroVM and remove local state
+## clean: terminate the tracked MicroVM (or MICROVM=<id>) and clear local state
 .PHONY: clean
-clean: require-id
+clean:
 	@set -e; \
-	id=$$(cat $(ID_FILE)); \
+	id="$(MICROVM)"; \
+	if [ -z "$$id" ]; then \
+	  if [ ! -f $(ID_FILE) ]; then \
+	    echo "No tracked MicroVM ($(ID_FILE) missing). Pass MICROVM=<id> to terminate a specific one." >&2; \
+	    exit 1; \
+	  fi; \
+	  id=$$(cat $(ID_FILE)); \
+	fi; \
 	aws lambda-microvms terminate-microvm --microvm-identifier "$$id" | jq; \
-	rm -f $(ID_FILE) $(ENDPOINT_FILE); \
-	echo "Terminated $$id and cleared local state."
+	if [ -f $(ID_FILE) ] && [ "$$id" = "$$(cat $(ID_FILE))" ]; then \
+	  rm -f $(ID_FILE) $(ENDPOINT_FILE); \
+	  echo "Terminated $$id and cleared local state."; \
+	else \
+	  echo "Terminated $$id."; \
+	fi
 
 ## list: list MicroVMs (RUNNING by default; STATE=ALL or STATE=<state> to filter)
 .PHONY: list

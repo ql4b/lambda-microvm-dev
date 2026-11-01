@@ -119,18 +119,22 @@ make image           # terraform apply: package app/, upload, build/update image
 make image-info      # show the current image (arn, version, state)
 make logs            # tail the MicroVM log group (LOG_ARGS="--follow ...")
 
-make run             # run a MicroVM; saves id + endpoint under .microvm/
+make run             # run a MicroVM (refuses if one is already tracked; FORCE=1 to override)
 make state           # get the running MicroVM's state
 make list            # list MicroVMs (RUNNING by default; STATE=ALL for all)
 make token           # mint an auth token (TOKEN_MINUTES=30 by default)
 make call            # curl the endpoint (mints a short-lived token)
-make clean           # terminate the MicroVM and clear local state
+make clean           # terminate the tracked MicroVM (or MICROVM=<id>) + clear state
 ```
 
 The lifecycle targets are stateful: `make run` records the `microvmId` and
 `endpoint` in a gitignored `.microvm/` directory, so `state`, `token`, `call`
 and `clean` operate on it without passing IDs around. `make run` refuses if
-`AWS_REGION` isn't set (i.e. you forgot `source activate`).
+`AWS_REGION` isn't set (i.e. you forgot `source activate`), and also refuses if
+a tracked MicroVM is still live — pass `FORCE=1` to launch another anyway, or
+`make clean` the current one first. `make clean MICROVM=<id>` terminates a
+specific MicroVM (handy for orphans shown by `make list`); it only clears the
+local `.microvm/` state when that id matches the tracked one.
 
 `make run` enables runtime logging: it reads the execution role ARN from the
 `execution_role_arn` Terraform output and passes it as `--execution-role-arn`
