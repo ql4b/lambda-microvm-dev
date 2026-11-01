@@ -88,8 +88,10 @@ logs:
 
 ## hooks-enable: enable lifecycle hooks on the image (out-of-band; builds a new version)
 # Re-submits the Terraform-managed image via update-microvm-image with --hooks.
-# NOTE: this mutates the image OUTSIDE Terraform — the next `make image`/apply
-# will overwrite the hooks config. For experimentation only.
+# NOTE: the provider has no `hooks` attribute, so Terraform neither tracks nor
+# detects this — a plain `tf apply` stays a no-op and PRESERVES the hooks.
+# They are only dropped when Terraform re-submits the image for another reason
+# (e.g. you edit app/ and code_artifact.uri changes); re-run this afterwards.
 .PHONY: hooks-enable
 hooks-enable:
 	@set -e; \
