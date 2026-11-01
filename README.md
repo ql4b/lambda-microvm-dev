@@ -138,6 +138,18 @@ a tracked MicroVM is still live — pass `FORCE=1` to launch another anyway, or
 specific MicroVM (handy for orphans shown by `make list`); it only clears the
 local `.microvm/` state when that id matches the tracked one.
 
+`make run`'s idle policy is overridable — tweak a single field or replace the
+whole blob:
+
+```bash
+make run MAX_IDLE=60                        # maxIdleDurationSeconds
+make run AUTO_RESUME=false SUSPENDED=120    # autoResumeEnabled + suspendedDurationSeconds
+make run IDLE_POLICY='{"autoResumeEnabled":true,"maxIdleDurationSeconds":10,"suspendedDurationSeconds":5}'
+```
+
+Likewise `LOG_GROUP=` overrides the runtime log group and `TOKEN_MINUTES=`
+the auth-token lifetime.
+
 `make run` enables runtime logging: it reads the execution role ARN from the
 `execution_role_arn` Terraform output and passes it as `--execution-role-arn`
 alongside `--logging` (required together). App logs go to

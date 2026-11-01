@@ -20,7 +20,13 @@ ENDPOINT_FILE := $(STATE_DIR)/endpoint
 REGION ?= $(AWS_REGION)
 INGRESS := arn:aws:lambda:$(REGION):aws:network-connector:aws-network-connector:ALL_INGRESS
 EGRESS  := arn:aws:lambda:$(REGION):aws:network-connector:aws-network-connector:INTERNET_EGRESS
-IDLE_POLICY := {"autoResumeEnabled":true,"maxIdleDurationSeconds":900,"suspendedDurationSeconds":300}
+# Idle policy — override individual fields, or replace IDLE_POLICY wholesale.
+#   make run MAX_IDLE=60 SUSPENDED=120 AUTO_RESUME=false
+#   make run IDLE_POLICY='{"autoResumeEnabled":true,"maxIdleDurationSeconds":10,"suspendedDurationSeconds":5}'
+AUTO_RESUME ?= true
+MAX_IDLE    ?= 900
+SUSPENDED   ?= 300
+IDLE_POLICY ?= {"autoResumeEnabled":$(AUTO_RESUME),"maxIdleDurationSeconds":$(MAX_IDLE),"suspendedDurationSeconds":$(SUSPENDED)}
 TOKEN_MINUTES ?= 30
 
 # Default state filter for `make list` (RUNNING; use STATE=ALL for everything).
