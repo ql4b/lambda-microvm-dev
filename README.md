@@ -117,6 +117,7 @@ make init            # terraform init
 make plan            # preview infra + image changes
 make image           # terraform apply: package app/, upload, build/update image
 make image-info      # show the current image (arn, version, state)
+make logs            # tail the MicroVM log group (LOG_ARGS="--follow ...")
 
 make run             # run a MicroVM; saves id + endpoint under .microvm/
 make state           # get the running MicroVM's state
@@ -183,10 +184,13 @@ shell first.
    response cleanly (use `make call 2>/dev/null | jq` to hide the banner too).
    Need a longer-lived token (e.g. for your own `curl`)? `make token`.
 
-4. **Inspect logs** — application stdout/stderr (and build logs) in CloudWatch:
+4. **Inspect logs** — application stdout/stderr (and build logs) in CloudWatch.
+   `make logs` tails the log group; append CLI flags via `LOG_ARGS`:
 
    ```bash
-   aws logs tail /aws/lambda-microvms/ql4b-microvm-dev --follow
+   make logs                                    # tail recent events
+   make logs LOG_ARGS="--follow"                # live tail
+   make logs LOG_ARGS="--since 3h --format short"
    ```
 
 5. **Tear down** — terminate the MicroVM and clear local state:

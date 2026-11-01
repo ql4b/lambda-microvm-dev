@@ -62,6 +62,13 @@ image:
 image-info:
 	$(TF) -chdir=$(INFRA_DIR) output -json microvm_image | jq
 
+## logs: tail the MicroVM log group; pass extra args via LOG_ARGS="..."
+# e.g. make logs LOG_ARGS="--follow --format short"
+#      make logs LOG_ARGS="--since 3h"
+.PHONY: logs
+logs:
+	aws logs tail $(LOG_GROUP) $(LOG_ARGS)
+
 # --- MicroVM lifecycle ------------------------------------------------------
 
 ## run: run a MicroVM from the current image; saves id + endpoint locally
