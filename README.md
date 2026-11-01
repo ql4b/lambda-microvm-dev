@@ -40,6 +40,7 @@ convention (`<namespace>-<name>-<attributes>`):
 |---|---|---|
 | S3 bucket (`…-artifacts`) | `artifacts.tf` | Stores the zipped app artifact. Private, versioned, SSE-AES256, encrypted-uploads-only. |
 | IAM build role (`…-lambda-build`) | `iam.tf` | Assumed by Lambda MicroVMs at **image build** time. Trust: `lambda.amazonaws.com` (`sts:AssumeRole` + `sts:TagSession`). Permissions: `s3:GetObject` on the bucket + CloudWatch Logs. |
+| IAM execution role (`…-microvm-exec`) | `iam.tf` | Assumed by the **running MicroVM** at runtime. Trust: `lambda.amazonaws.com` (`sts:AssumeRole` + `sts:TagSession`). Permissions: CloudWatch Logs scoped to the runtime log group. Required when runtime logging is enabled. |
 | MicroVM image (`aws_lambdamicrovms_image`) | `microvm.tf` | Built from the S3 artifact + managed base image, CPU arch `ARM_64`. |
 
 > **Packaging is in Terraform.** `microvm.tf` zips `app/` (`archive_file`) and
@@ -48,12 +49,21 @@ convention (`<namespace>-<name>-<attributes>`):
 > app source triggers an in-place image rebuild (a new image version, major
 > bump `1.0 → 2.0 → …`) rather than a destroy/recreate.
 
+> **Logging.** Two CloudWatch streams, both under
+> `/aws/lambda-microvms/<namespace>-<name>` (e.g.
+> `/aws/lambda-microvms/ql4b-microvm-dev`):
+> *build logs* (image creation, written via the build role) and *runtime logs*
+> (the app's stdout/stderr). Runtime logging is enabled on `run-microvm`
+> (`--logging`), which **requires** an execution role — hence the
+> `…-microvm-exec` role above. Tail with
+> `aws logs tail /aws/lambda-microvms/ql4b-microvm-dev --follow`.
+
 ### Provision
 
 ```bash
 cd infra
 terraform init
-terraform apply   # creates the bucket and build role first
+terraform apply   # creates the bucket, build role, execution role, image
 ```
 
 > Per the repo's IaC delivery rule, applies in a shared/graduated stack go
@@ -99,6 +109,13 @@ The lifecycle targets are stateful: `make run` records the `microvmId` and
 and `clean` operate on it without passing IDs around. `make run` refuses if
 `AWS_REGION` isn't set (i.e. you forgot `source activate`).
 
+`make run` enables runtime logging: it reads the execution role ARN from the
+`execution_role_arn` Terraform output and passes it as `--execution-role-arn`
+alongside `--logging` (required together). App logs go to
+`/aws/lambda-microvms/<namespace>-<name>`; override the group with
+`make run LOG_GROUP=/my/group` (the execution role's permissions are scoped to
+the default group, so a custom group may need the policy widened).
+
 Typical loop:
 
 ```bash
@@ -140,10 +157,15 @@ tf output -json microvm_image | jq
 ```bash
 aws lambda-microvms run-microvm \
   --image-identifier arn:aws:lambda:us-east-1:123456789012:microvm-image:ql4b-microvm-dev  \
+  --execution-role-arn arn:aws:iam::123456789012:role/ql4b-microvm-dev-microvm-exec \
   --ingress-network-connectors "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:ALL_INGRESS" \
   --egress-network-connectors "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:INTERNET_EGRESS" \
+  --logging '{"cloudWatch":{"logGroup":"/aws/lambda-microvms/ql4b-microvm-dev"}}' \
   --idle-policy '{"autoResumeEnabled":true,"maxIdleDurationSeconds":900,"suspendedDurationSeconds":300}'
 ```
+
+> `--logging` requires `--execution-role-arn`; the running MicroVM assumes that
+> role to write its application logs.
 
 ```bash
 {
