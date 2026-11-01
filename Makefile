@@ -6,7 +6,7 @@
 # Packaging + upload is handled by Terraform (archive_file + aws_s3_object),
 # so `make image` applies the config; there is no manual zip/upload step.
 #
-# Stateful targets (run/state/token/call/clean) persist the running MicroVM's
+# Stateful targets (run/state/token/call/terminate) persist the running MicroVM's
 # id and endpoint under .microvm/ so they can chain across make invocations.
 
 SHELL := /bin/bash
@@ -91,7 +91,7 @@ run: require-region
 	  case "$$state" in \
 	    ""|TERMINATED|TERMINATING) ;; \
 	    *) echo "A MicroVM is already tracked: $$existing ($$state)." >&2; \
-	       echo "  terminate it with 'make clean', or re-run with FORCE=1 to launch another." >&2; \
+	       echo "  terminate it with 'make terminate', or re-run with FORCE=1 to launch another." >&2; \
 	       exit 1 ;; \
 	  esac; \
 	fi; \
@@ -164,9 +164,9 @@ call: require-id
 	curl -sS -D /dev/stderr -H "X-aws-proxy-auth: $$token" "https://$$endpoint/"; \
 	echo
 
-## clean: terminate the tracked MicroVM (or MICROVM=<id>) and clear local state
-.PHONY: clean
-clean:
+## terminate: terminate the tracked MicroVM (or MICROVM=<id>) and clear local state
+.PHONY: terminate
+terminate:
 	@set -e; \
 	id="$(MICROVM)"; \
 	if [ -z "$$id" ]; then \

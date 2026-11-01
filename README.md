@@ -126,16 +126,16 @@ make resume          # resume the tracked MicroVM (SUSPENDED -> RUNNING)
 make list            # list MicroVMs (RUNNING by default; STATE=ALL for all)
 make token           # mint an auth token (TOKEN_MINUTES=30 by default)
 make call            # curl the endpoint (mints a short-lived token)
-make clean           # terminate the tracked MicroVM (or MICROVM=<id>) + clear state
+make terminate       # terminate the tracked MicroVM (or MICROVM=<id>) + clear state
 ```
 
 The lifecycle targets are stateful: `make run` records the `microvmId` and
 `endpoint` in a gitignored `.microvm/` directory, so `state`, `token`, `call`
-and `clean` operate on it without passing IDs around. `make run` refuses if
+and `terminate` operate on it without passing IDs around. `make run` refuses if
 `AWS_REGION` isn't set (i.e. you forgot `source activate`), and also refuses if
 a tracked MicroVM is still live — pass `FORCE=1` to launch another anyway, or
-`make clean` the current one first. `make clean MICROVM=<id>` terminates a
-specific MicroVM (handy for orphans shown by `make list`); it only clears the
+`make terminate` the current one first. `make terminate MICROVM=<id>` terminates
+a specific MicroVM (handy for orphans shown by `make list`); it only clears the
 local `.microvm/` state when that id matches the tracked one.
 
 `make run`'s idle policy is overridable — tweak a single field or replace the
@@ -163,7 +163,7 @@ Typical loop:
 make image && make run && make call
 # ... iterate on app/ ...
 make image && make run && make call
-make clean
+make terminate
 ```
 
 ## Workflow
@@ -215,7 +215,7 @@ shell first.
 5. **Tear down** — terminate the MicroVM and clear local state:
 
    ```bash
-   make clean
+   make terminate
    ```
 
 Iterating on the app is just steps 1–3 again (`make image && make run && make
