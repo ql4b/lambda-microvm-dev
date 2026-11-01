@@ -34,3 +34,8 @@ output "microvm_image" {
     state         = aws_lambdamicrovms_image.app.state
   }
 }
+
+# Flat string output for scripting (used by the Makefile `run` target).
+output "microvm_image_arn" {
+  value = aws_lambdamicrovms_image.app.arn
+}

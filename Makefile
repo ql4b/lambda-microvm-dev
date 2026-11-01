@@ -10,7 +10,6 @@
 # id and endpoint under .microvm/ so they can chain across make invocations.
 
 SHELL := /bin/bash
-.ONESHELL:
 
 INFRA_DIR  := infra
 STATE_DIR  := .microvm
@@ -41,51 +40,59 @@ help:
 ## init: terraform init
 .PHONY: init
 init:
-	cd $(INFRA_DIR) && $(TF) init
+	$(TF) -chdir=$(INFRA_DIR) init
 
 ## plan: preview infrastructure + image changes
 .PHONY: plan
 plan:
-	cd $(INFRA_DIR) && $(TF) plan
+	$(TF) -chdir=$(INFRA_DIR) plan
 
 ## image: build/update the MicroVM image (packages app/, uploads, applies)
 .PHONY: image
 image:
-	cd $(INFRA_DIR) && $(TF) apply
+	$(TF) -chdir=$(INFRA_DIR) apply
 
 ## image-info: show the current MicroVM image (arn, version, state)
 .PHONY: image-info
 image-info:
-	cd $(INFRA_DIR) && $(TF) output -json microvm_image | jq
+	$(TF) -chdir=$(INFRA_DIR) output -json microvm_image | jq
 
 # --- MicroVM lifecycle ------------------------------------------------------
 
 ## run: run a MicroVM from the current image; saves id + endpoint locally
 .PHONY: run
 run: require-region
-	mkdir -p $(STATE_DIR)
-	image_arn=$$(cd $(INFRA_DIR) && $(TF) output -json microvm_image | jq -r '.arn')
-	echo "Running MicroVM from $$image_arn ..."
+	@set -e; \
+	mkdir -p $(STATE_DIR); \
+	image_arn=$$($(TF) -chdir=$(INFRA_DIR) output -raw microvm_image_arn 2>/dev/null || true); \
+	test -n "$$image_arn" || { \
+	  echo "Could not read the image ARN from terraform outputs." >&2; \
+	  echo "  - did you run 'source activate'?" >&2; \
+	  echo "  - has the image been built?  run 'make image'" >&2; \
+	  echo "  - check: $(TF) -chdir=$(INFRA_DIR) output microvm_image_arn" >&2; \
+	  exit 1; \
+	}; \
+	echo "Running MicroVM from $$image_arn ..."; \
 	resp=$$(aws lambda-microvms run-microvm \
 	  --image-identifier "$$image_arn" \
 	  --ingress-network-connectors "$(INGRESS)" \
 	  --egress-network-connectors "$(EGRESS)" \
-	  --idle-policy '$(IDLE_POLICY)')
-	echo "$$resp" | jq
-	echo "$$resp" | jq -r '.microvmId' > $(ID_FILE)
-	echo "$$resp" | jq -r '.endpoint'  > $(ENDPOINT_FILE)
+	  --idle-policy '$(IDLE_POLICY)'); \
+	echo "$$resp" | jq; \
+	echo "$$resp" | jq -r '.microvmId' > $(ID_FILE); \
+	echo "$$resp" | jq -r '.endpoint'  > $(ENDPOINT_FILE); \
 	echo "Saved id -> $(ID_FILE), endpoint -> $(ENDPOINT_FILE)"
 
 ## state: fetch the running MicroVM's current state
 .PHONY: state
 state: require-id
-	aws lambda-microvms get-microvm \
+	@aws lambda-microvms get-microvm \
 	  --microvm-identifier "$$(cat $(ID_FILE))" | jq
 
 ## token: mint an auth token (TOKEN_MINUTES, default 30); prints the token
 .PHONY: token
 token: require-id
-	aws lambda-microvms create-microvm-auth-token \
+	@aws lambda-microvms create-microvm-auth-token \
 	  --microvm-identifier "$$(cat $(ID_FILE))" \
 	  --expiration-in-minutes $(TOKEN_MINUTES) \
 	  --allowed-ports '[{"allPorts":{}}]' \
@@ -94,22 +101,24 @@ token: require-id
 ## call: curl the running MicroVM endpoint (mints a short-lived token)
 .PHONY: call
 call: require-id
-	endpoint=$$(cat $(ENDPOINT_FILE))
+	@set -e; \
+	endpoint=$$(cat $(ENDPOINT_FILE)); \
 	token=$$(aws lambda-microvms create-microvm-auth-token \
 	  --microvm-identifier "$$(cat $(ID_FILE))" \
 	  --expiration-in-minutes 5 \
 	  --allowed-ports '[{"allPorts":{}}]' \
-	  | jq -r '.authToken."X-aws-proxy-auth"')
-	echo "GET https://$$endpoint/"
-	curl -sS -H "X-aws-proxy-auth: $$token" "https://$$endpoint/"
+	  | jq -r '.authToken."X-aws-proxy-auth"'); \
+	echo "GET https://$$endpoint/"; \
+	curl -sS -H "X-aws-proxy-auth: $$token" "https://$$endpoint/"; \
 	echo
 
 ## clean: terminate the running MicroVM and remove local state
 .PHONY: clean
 clean: require-id
-	id=$$(cat $(ID_FILE))
-	aws lambda-microvms terminate-microvm --microvm-identifier "$$id" | jq
-	rm -f $(ID_FILE) $(ENDPOINT_FILE)
+	@set -e; \
+	id=$$(cat $(ID_FILE)); \
+	aws lambda-microvms terminate-microvm --microvm-identifier "$$id" | jq; \
+	rm -f $(ID_FILE) $(ENDPOINT_FILE); \
 	echo "Terminated $$id and cleared local state."
 
 # --- guards -----------------------------------------------------------------
