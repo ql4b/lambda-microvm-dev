@@ -14,6 +14,7 @@ snapshot-resumable compute environments that run a container inside a microVM.
   * [Provision](#provision)
 * [Prerequisites](#prerequisites)
 * [Using the Makefile](#using-the-makefile)
+  * [Lifecycle hooks](#lifecycle-hooks)
 * [Workflow](#workflow)
 * [Workflow — raw CLI (getting-started reference)](#workflow--raw-cli-getting-started-reference)
   * [Package and upload artifact](#package-and-upload-artifact-now-handled-by-make-image)
@@ -117,6 +118,7 @@ make init            # terraform init
 make plan            # preview infra + image changes
 make image           # terraform apply: package app/, upload, build/update image
 make image-info      # show the current image (arn, version, state)
+make hooks-enable    # enable lifecycle hooks on the image (out-of-band)
 make logs            # tail the MicroVM log group (LOG_ARGS="--follow ...")
 
 make run             # run a MicroVM (refuses if one is already tracked; FORCE=1 to override)
@@ -156,6 +158,39 @@ alongside `--logging` (required together). App logs go to
 `/aws/lambda-microvms/<namespace>-<name>`; override the group with
 `make run LOG_GROUP=/my/group` (the execution role's permissions are scoped to
 the default group, so a custom group may need the policy widened).
+
+### Lifecycle hooks
+
+The app (`app/app.js`) runs a second HTTP server on port `9000` that answers the
+MicroVM lifecycle hook paths (`/aws/lambda-microvms/runtime/v1/{ready,validate,
+run,resume,suspend,terminate}`), logs each call, and returns `200`. Hooks let the
+app react to build/run/suspend/resume/terminate transitions.
+
+Enable them on the image (then exercise and observe via the logs):
+
+```bash
+make hooks-enable                          # re-submit the image with --hooks (new version)
+make run RUN_PAYLOAD='{"session":"abc"}'   # /run fires with this payload
+make suspend                               # /suspend fires
+make resume                                # /resume fires
+make terminate                             # /terminate fires
+make logs LOG_ARGS="--since 15m"           # each hook logs a line
+```
+
+Notes:
+
+* **`RUN_PAYLOAD` requires hooks** — `run-microvm` rejects a `runHookPayload`
+  unless the image has the `run` hook enabled (run `make hooks-enable` first),
+  otherwise: `ValidationException: The run hook must be enabled ...`.
+* **Enabling any runtime hook requires `/ready`** — the default `HOOKS` config
+  enables it; the app answers it, so the build succeeds.
+* **Out-of-band, by necessity.** The Terraform provider's
+  `aws_lambdamicrovms_image` has no `hooks`/`logging`/`resources` arguments yet
+  ([hashicorp/terraform-provider-aws#49821](https://github.com/hashicorp/terraform-provider-aws/issues/49821)),
+  so hooks are applied with `update-microvm-image`. Terraform doesn't track
+  them: a no-op `tf apply` preserves them, but a rebuild driven by a changed
+  `code_artifact.uri` (i.e. editing `app/`) resets them to null — re-run
+  `make hooks-enable` after such a rebuild.
 
 Typical loop:
 
