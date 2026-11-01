@@ -14,7 +14,8 @@ snapshot-resumable compute environments that run a container inside a microVM.
   * [Provision](#provision)
 * [Prerequisites](#prerequisites)
 * [Using the Makefile](#using-the-makefile)
-* [Workflow (getting-started)](#workflow-getting-started)
+* [Workflow](#workflow)
+* [Workflow — raw CLI (getting-started reference)](#workflow--raw-cli-getting-started-reference)
   * [Package and upload artifact](#package-and-upload-artifact-now-handled-by-make-image)
   * [Fetch MicroMV Image](#fetch-micromv-image)
   * [Run microVM](#run-microvm)
@@ -145,14 +146,59 @@ make image && make run && make call
 make clean
 ```
 
-The sections below document the same steps as raw `aws` CLI commands — what
-the Makefile targets run under the hood.
+## Workflow
 
-## Workflow (getting-started)
+The end-to-end loop, using the `make` targets. Run `source ./activate` once per
+shell first.
 
-> These are the underlying CLI commands. For day-to-day use prefer the
-> `make` targets above; packaging (the step below) is now done by `make image`
-> / `terraform apply`, not by hand.
+1. **Build / update the image** — package `app/`, upload, and build (or rebuild)
+   the MicroVM image:
+
+   ```bash
+   make image
+   make image-info        # arn, version, state
+   ```
+
+2. **Run a MicroVM** — launch an instance from the current image (with runtime
+   logging + execution role wired in automatically); the id and endpoint are
+   saved under `.microvm/`:
+
+   ```bash
+   make run
+   make state             # poll until state is RUNNING
+   ```
+
+3. **Call it** — hit the endpoint (mints a short-lived auth token for you):
+
+   ```bash
+   make call
+   # {"status":"ok","path":"/"}
+   ```
+
+   Need a longer-lived token (e.g. for your own `curl`)? `make token`.
+
+4. **Inspect logs** — application stdout/stderr (and build logs) in CloudWatch:
+
+   ```bash
+   aws logs tail /aws/lambda-microvms/ql4b-microvm-dev --follow
+   ```
+
+5. **Tear down** — terminate the MicroVM and clear local state:
+
+   ```bash
+   make clean
+   ```
+
+Iterating on the app is just steps 1–3 again (`make image && make run && make
+call`). The next section shows the raw `aws` commands each target runs, for
+reference / the getting-started phase.
+
+## Workflow — raw CLI (getting-started reference)
+
+> These are the underlying `aws` / `terraform` commands the `make` targets run.
+> For day-to-day use prefer the Makefile targets above; this section is kept as
+> a getting-started reference and for one-off debugging. Packaging (the first
+> step) is now done by `make image` / `tf apply`, not by hand.
 
 ### Package and upload artifact (now handled by `make image`)
 
