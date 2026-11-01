@@ -155,7 +155,7 @@ call: require-id
 	  --allowed-ports '[{"allPorts":{}}]' \
 	  | jq -r '.authToken."X-aws-proxy-auth"'); \
 	echo "GET https://$$endpoint/" >&2; \
-	curl -sS -H "X-aws-proxy-auth: $$token" "https://$$endpoint/"; \
+	curl -sS -D /dev/stderr -H "X-aws-proxy-auth: $$token" "https://$$endpoint/"; \
 	echo
 
 ## clean: terminate the tracked MicroVM (or MICROVM=<id>) and clear local state
