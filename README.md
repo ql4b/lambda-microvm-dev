@@ -77,10 +77,14 @@ convention (`<namespace>-<name>-<attributes>`):
 ### Provision
 
 ```bash
-cd infra
-terraform init
-terraform apply   # creates the bucket, build role, execution role, image
+source ./activate   # loads .env and puts the `tf` wrapper on PATH
+tf init
+tf apply            # creates the bucket, build role, execution role, image
 ```
+
+> `tf` is a thin wrapper (on PATH after `source ./activate`) that runs
+> `terraform -chdir=infra` with `.env` loaded — so run it from the repo root,
+> no `cd infra` needed.
 
 > Per the repo's IaC delivery rule, applies in a shared/graduated stack go
 > through the environment branch, not a local working copy. For this dev
