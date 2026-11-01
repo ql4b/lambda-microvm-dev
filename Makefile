@@ -23,6 +23,9 @@ EGRESS  := arn:aws:lambda:$(REGION):aws:network-connector:aws-network-connector:
 IDLE_POLICY := {"autoResumeEnabled":true,"maxIdleDurationSeconds":900,"suspendedDurationSeconds":300}
 TOKEN_MINUTES ?= 30
 
+# Default state filter for `make list` (RUNNING; use STATE=ALL for everything).
+STATE ?= RUNNING
+
 # Runtime log group for the MicroVM's application stdout/stderr. Defaults to
 # /aws/lambda-microvms/<namespace>-<name>; override with LOG_GROUP=... .
 LOG_GROUP ?= /aws/lambda-microvms/$(NAMESPACE)-$(NAME)
@@ -140,6 +143,16 @@ clean: require-id
 	aws lambda-microvms terminate-microvm --microvm-identifier "$$id" | jq; \
 	rm -f $(ID_FILE) $(ENDPOINT_FILE); \
 	echo "Terminated $$id and cleared local state."
+
+## list: list MicroVMs (RUNNING by default; STATE=ALL or STATE=<state> to filter)
+.PHONY: list
+list:
+	@aws lambda-microvms list-microvms \
+	  | jq -r --arg s "$(STATE)" \
+	    '.items | map(select($$s=="ALL" or .state==$$s)) \
+	      | (["MICROVM_ID","STATE","IMAGE_VERSION","STARTED_AT"], \
+	         (.[] | [.microvmId,.state,.imageVersion,.startedAt])) | @tsv' \
+	  | column -t
 
 # --- guards -----------------------------------------------------------------
 

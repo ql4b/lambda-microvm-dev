@@ -121,6 +121,7 @@ make logs            # tail the MicroVM log group (LOG_ARGS="--follow ...")
 
 make run             # run a MicroVM; saves id + endpoint under .microvm/
 make state           # get the running MicroVM's state
+make list            # list MicroVMs (RUNNING by default; STATE=ALL for all)
 make token           # mint an auth token (TOKEN_MINUTES=30 by default)
 make call            # curl the endpoint (mints a short-lived token)
 make clean           # terminate the MicroVM and clear local state
