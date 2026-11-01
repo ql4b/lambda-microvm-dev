@@ -1,0 +1,20 @@
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# MicroVM build artifacts (zipped app + Dockerfile uploaded to S3)
+app.zip
+*.zip
+
+# Node (if the app is built locally before packaging)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
