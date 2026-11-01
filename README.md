@@ -6,6 +6,22 @@ snapshot-resumable compute environments that run a container inside a microVM.
 * AWS guide: https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html
 * Getting started: https://docs.aws.amazon.com/lambda/latest/dg/microvms-getting-started.html
 
+## Contents
+
+* [What's here](#whats-here)
+  * [How the pieces fit](#how-the-pieces-fit)
+* [Infrastructure (`infra/`)](#infrastructure-infra)
+  * [Provision](#provision)
+* [Prerequisites](#prerequisites)
+* [Using the Makefile](#using-the-makefile)
+* [Workflow (getting-started)](#workflow-getting-started)
+  * [Package and upload artifact](#package-and-upload-artifact-now-handled-by-make-image)
+  * [Fetch MicroMV Image](#fetch-micromv-image)
+  * [Run microVM](#run-microvm)
+  * [Fetch MicroMV state](#fetch-micromv-state)
+  * [Create Auth Token](#create-auth-token)
+  * [Cleanup](#cleanup)
+
 ## What's here
 
 ```
