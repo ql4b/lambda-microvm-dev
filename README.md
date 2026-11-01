@@ -171,10 +171,16 @@ shell first.
 3. **Call it** — hit the endpoint (mints a short-lived auth token for you):
 
    ```bash
-   make call
-   # {"status":"ok","path":"/"}
+   make call | jq
+   # {
+   #   "status": "ok",
+   #   "path": "/",
+   #   "microvm": { "image_name": "ql4b-microvm-dev", "image_version": "3.0" }
+   # }
    ```
 
+   The `GET <url>` banner prints to stderr, so piping stdout to `jq` parses the
+   response cleanly (use `make call 2>/dev/null | jq` to hide the banner too).
    Need a longer-lived token (e.g. for your own `curl`)? `make token`.
 
 4. **Inspect logs** — application stdout/stderr (and build logs) in CloudWatch:
