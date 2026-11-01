@@ -23,6 +23,11 @@ EGRESS  := arn:aws:lambda:$(REGION):aws:network-connector:aws-network-connector:
 IDLE_POLICY := {"autoResumeEnabled":true,"maxIdleDurationSeconds":900,"suspendedDurationSeconds":300}
 TOKEN_MINUTES ?= 30
 
+# Runtime log group for the MicroVM's application stdout/stderr. Defaults to
+# /aws/lambda-microvms/<namespace>-<name>; override with LOG_GROUP=... .
+LOG_GROUP ?= /aws/lambda-microvms/$(NAMESPACE)-$(NAME)
+LOGGING   := {"cloudWatch":{"logGroup":"$(LOG_GROUP)"}}
+
 # Terraform wrapper (uses pinned binary from .env if present, else `terraform`).
 TF := $(if $(TERRAFORM_BIN),$(TERRAFORM_BIN),terraform)
 
@@ -73,10 +78,18 @@ run: require-region
 	  exit 1; \
 	}; \
 	echo "Running MicroVM from $$image_arn ..."; \
+	exec_role_arn=$$($(TF) -chdir=$(INFRA_DIR) output -raw execution_role_arn 2>/dev/null || true); \
+	test -n "$$exec_role_arn" || { \
+	  echo "Could not read the execution role ARN (output 'execution_role_arn')." >&2; \
+	  echo "  logging requires an execution role; run 'make image' to refresh outputs." >&2; \
+	  exit 1; \
+	}; \
 	resp=$$(aws lambda-microvms run-microvm \
 	  --image-identifier "$$image_arn" \
+	  --execution-role-arn "$$exec_role_arn" \
 	  --ingress-network-connectors "$(INGRESS)" \
 	  --egress-network-connectors "$(EGRESS)" \
+	  --logging '$(LOGGING)' \
 	  --idle-policy '$(IDLE_POLICY)'); \
 	echo "$$resp" | jq; \
 	echo "$$resp" | jq -r '.microvmId' > $(ID_FILE); \

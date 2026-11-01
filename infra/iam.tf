@@ -39,3 +39,41 @@ module "lambda_role" {
   policy_description = "Allow Lambda to read microVM artifacts and write logs"
   policy_documents   = [data.aws_iam_policy_document.lambda_artifacts.json]
 }
+
+# IAM role the running MicroVM assumes at RUNTIME (execution role). Scoped to
+# writing the MicroVM's application logs to CloudWatch. Required whenever
+# runtime logging is enabled on run-microvm.
+data "aws_iam_policy_document" "microvm_execution" {
+  statement {
+    sid    = "WriteRuntimeLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    # The runtime log group (and its per-version streams) used by run-microvm.
+    resources = [
+      "arn:aws:logs:*:*:log-group:/aws/lambda-microvms/${module.label.id}",
+      "arn:aws:logs:*:*:log-group:/aws/lambda-microvms/${module.label.id}:*",
+    ]
+  }
+}
+
+module "execution_role" {
+  source  = "cloudposse/iam-role/aws"
+  version = "1.0.0"
+
+  context    = module.label.context
+  attributes = ["microvm", "exec"]
+
+  # Trust policy: only the Lambda service may assume this role.
+  principals = {
+    Service = ["lambda.amazonaws.com"]
+  }
+  assume_role_actions = ["sts:AssumeRole", "sts:TagSession"]
+
+  role_description   = "Execution role assumed by running microVMs (write runtime logs)"
+  policy_description = "Allow a running microVM to write its application logs to CloudWatch"
+  policy_documents   = [data.aws_iam_policy_document.microvm_execution.json]
+}
