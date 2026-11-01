@@ -42,9 +42,11 @@ convention (`<namespace>-<name>-<attributes>`):
 | IAM build role (`…-lambda-build`) | `iam.tf` | Assumed by Lambda MicroVMs at **image build** time. Trust: `lambda.amazonaws.com` (`sts:AssumeRole` + `sts:TagSession`). Permissions: `s3:GetObject` on the bucket + CloudWatch Logs. |
 | MicroVM image (`aws_lambdamicrovms_image`) | `microvm.tf` | Built from the S3 artifact + managed base image, CPU arch `ARM_64`. |
 
-> **Note:** `microvm.tf` currently **hardcodes** the artifact key as
-> `app.zip` and assumes it was zipped and uploaded manually (see below).
-> This gets wired to an automated package+upload step later.
+> **Packaging is in Terraform.** `microvm.tf` zips `app/` (`archive_file`) and
+> uploads it (`aws_s3_object`) on `apply` — no manual zip/upload needed. The
+> `code_artifact.uri` pins the uploaded object's `versionId`, so changing the
+> app source triggers an in-place image rebuild (a new image version, major
+> bump `1.0 → 2.0 → …`) rather than a destroy/recreate.
 
 ### Provision
 
@@ -70,9 +72,52 @@ terraform apply   # creates the bucket and build role first
 > real run and are illustrative — substitute your own. Use
 > `terraform output -json microvm_image | jq` to get the current image ARN.
 
+## Using the Makefile
+
+A `Makefile` at the repo root wraps the whole workflow. Load the environment
+first (`source activate` reads `.env`: `AWS_PROFILE`, `AWS_REGION`, the
+`TF_VAR_*` values), then drive everything with `make`:
+
+```bash
+source activate      # sets AWS_PROFILE / AWS_REGION / TF_VAR_* from .env
+make help            # list all targets
+
+make init            # terraform init
+make plan            # preview infra + image changes
+make image           # terraform apply: package app/, upload, build/update image
+make image-info      # show the current image (arn, version, state)
+
+make run             # run a MicroVM; saves id + endpoint under .microvm/
+make state           # get the running MicroVM's state
+make token           # mint an auth token (TOKEN_MINUTES=30 by default)
+make call            # curl the endpoint (mints a short-lived token)
+make clean           # terminate the MicroVM and clear local state
+```
+
+The lifecycle targets are stateful: `make run` records the `microvmId` and
+`endpoint` in a gitignored `.microvm/` directory, so `state`, `token`, `call`
+and `clean` operate on it without passing IDs around. `make run` refuses if
+`AWS_REGION` isn't set (i.e. you forgot `source activate`).
+
+Typical loop:
+
+```bash
+make image && make run && make call
+# ... iterate on app/ ...
+make image && make run && make call
+make clean
+```
+
+The sections below document the same steps as raw `aws` CLI commands — what
+the Makefile targets run under the hood.
+
 ## Workflow (getting-started)
 
-### Package and upload artifact
+> These are the underlying CLI commands. For day-to-day use prefer the
+> `make` targets above; packaging (the step below) is now done by `make image`
+> / `terraform apply`, not by hand.
+
+### Package and upload artifact (now handled by `make image`)
 
 ```bash
 cd app

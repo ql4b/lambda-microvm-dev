@@ -7,6 +7,9 @@
 app.zip
 *.zip
 
+# Local MicroVM workflow state (Makefile: id + endpoint of running MicroVM)
+.microvm/
+
 # Node (if the app is built locally before packaging)
 node_modules/
 npm-debug.log*
