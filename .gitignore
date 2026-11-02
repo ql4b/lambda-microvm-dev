@@ -7,6 +7,9 @@
 app.zip
 *.zip
 
+# Local-only experimental image variant (not part of the public demo)
+app/kiro.Dockerfile
+
 # Local MicroVM workflow state (Makefile: id + endpoint of running MicroVM)
 .microvm/
 

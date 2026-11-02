@@ -16,13 +16,6 @@ snapshot-resumable compute environments that run a container inside a microVM.
 * [Using the Makefile](#using-the-makefile)
   * [Lifecycle hooks](#lifecycle-hooks)
 * [Workflow](#workflow)
-* [Workflow — raw CLI (getting-started reference)](#workflow--raw-cli-getting-started-reference)
-  * [Package and upload artifact](#package-and-upload-artifact-now-handled-by-make-image)
-  * [Fetch MicroMV Image](#fetch-micromv-image)
-  * [Run microVM](#run-microvm)
-  * [Fetch MicroMV state](#fetch-micromv-state)
-  * [Create Auth Token](#create-auth-token)
-  * [Cleanup](#cleanup)
 
 ## What's here
 
@@ -100,9 +93,7 @@ tf apply            # creates the bucket, build role, execution role, image
 * `aws` CLI with Lambda MicroVMs support, plus `jq`
 * The MicroVM artifact bucket and image must be in the **same region**
 
-> The account IDs, ARNs, endpoints and tokens in the examples below are from a
-> real run and are illustrative — substitute your own. Use
-> `terraform output -json microvm_image | jq` to get the current image ARN.
+> Use `terraform output -json microvm_image | jq` to get the current image ARN.
 
 ## Using the Makefile
 
@@ -256,154 +247,4 @@ shell first.
    ```
 
 Iterating on the app is just steps 1–3 again (`make image && make run && make
-call`). The next section shows the raw `aws` commands each target runs, for
-reference / the getting-started phase.
-
-## Workflow — raw CLI (getting-started reference)
-
-> These are the underlying `aws` / `terraform` commands the `make` targets run.
-> For day-to-day use prefer the Makefile targets above; this section is kept as
-> a getting-started reference and for one-off debugging. Packaging (the first
-> step) is now done by `make image` / `tf apply`, not by hand.
-
-### Package and upload artifact (now handled by `make image`)
-
-```bash
-cd app
-zip app.zip app.js Dockerfile
-aws s3 cp app.zip s3://ql4b-microvm-dev-artifacts/app.zip --sse AES256
-```
-
-> The `--sse AES256` flag is required: the bucket policy denies uploads that
-> don't request server-side encryption. The object key must be `app.zip` to
-> match the hardcoded `code_artifact.uri` in `infra/microvm.tf`.
-
-### Fetch MicroMV Image 
-
-```bash
-tf output -json microvm_image | jq
-```
-
-### Run microVM
-
-```bash
-aws lambda-microvms run-microvm \
-  --image-identifier arn:aws:lambda:us-east-1:123456789012:microvm-image:ql4b-microvm-dev  \
-  --execution-role-arn arn:aws:iam::123456789012:role/ql4b-microvm-dev-microvm-exec \
-  --ingress-network-connectors "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:ALL_INGRESS" \
-  --egress-network-connectors "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:INTERNET_EGRESS" \
-  --logging '{"cloudWatch":{"logGroup":"/aws/lambda-microvms/ql4b-microvm-dev"}}' \
-  --idle-policy '{"autoResumeEnabled":true,"maxIdleDurationSeconds":900,"suspendedDurationSeconds":300}'
-```
-
-> `--logging` requires `--execution-role-arn`; the running MicroVM assumes that
-> role to write its application logs.
-
-```bash
-{
-    "microvmId": "microvm-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "state": "PENDING",
-    "endpoint": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.lambda-microvm.us-east-1.on.aws",
-    "imageArn": "arn:aws:lambda:us-east-1:123456789012:microvm-image:ql4b-microvm-dev",
-    "imageVersion": "1.0",
-    "idlePolicy": {
-        "maxIdleDurationSeconds": 900,
-        "suspendedDurationSeconds": 300,
-        "autoResumeEnabled": true
-    },
-    "maximumDurationInSeconds": 28800,
-    "startedAt": "2026-11-01T22:02:27.861000+01:00",
-    "ingressNetworkConnectors": [
-        "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:ALL_INGRESS"
-    ],
-    "egressNetworkConnectors": [
-        "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:INTERNET_EGRESS"
-    ]
-}
-```
-
-### Fetch MicroMV state 
-
-```bash
-aws lambda-microvms get-microvm \
-  --microvm-identifier  microvm-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-```
-
-```bash
-{
-    "microvmId": "microvm-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "state": "RUNNING",
-    "endpoint": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.lambda-microvm.us-east-1.on.aws",
-    "imageArn": "arn:aws:lambda:us-east-1:123456789012:microvm-image:ql4b-microvm-dev",
-    "imageVersion": "1.0",
-    "idlePolicy": {
-        "maxIdleDurationSeconds": 900,
-        "suspendedDurationSeconds": 300,
-        "autoResumeEnabled": true
-    },
-    "maximumDurationInSeconds": 28800,
-    "startedAt": "2026-11-01T22:02:27.861000+01:00",
-    "ingressNetworkConnectors": [
-        "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:ALL_INGRESS"
-    ],
-    "egressNetworkConnectors": [
-        "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:INTERNET_EGRESS"
-    ]
-}
-```
-
-### Create Auth Token
-
-```bash
-aws lambda-microvms create-microvm-auth-token   \
-    --microvm-identifier  microvm-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  --expiration-in-minutes 30   \
-    --allowed-ports '[{"allPorts":{}}]'
-```
-
-```bash 
-curl -sS -H 'X-aws-proxy-auth:  <auth-token>' \
-    https://xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.lambda-microvm.us-east-1.on.aws
-```
-
-```bash
-{
-  "status": "ok",
-  "path": "/"
-}
-```
-
-### Cleanup
-
-```bash
-aws lambda-microvms terminate-microvm \
-  --microvm-identifier  microvm-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 
-```
-```bash
-aws lambda-microvms get-microvm \
-  --microvm-identifier  microvm-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-```
-
-```bash
-{
-    "microvmId": "microvm-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "state": "TERMINATED",
-    "endpoint": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.lambda-microvm.us-east-1.on.aws",
-    "imageArn": "arn:aws:lambda:us-east-1:123456789012:microvm-image:ql4b-microvm-dev",
-    "imageVersion": "1.0",
-    "idlePolicy": {
-        "maxIdleDurationSeconds": 900,
-        "suspendedDurationSeconds": 300,
-        "autoResumeEnabled": true
-    },
-    "maximumDurationInSeconds": 28800,
-    "startedAt": "2026-11-01T22:02:27.861000+01:00",
-    "terminatedAt": "2026-11-01T22:18:58.297000+01:00",
-    "stateReason": "Success.",
-    "ingressNetworkConnectors": [
-        "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:ALL_INGRESS"
-    ],
-    "egressNetworkConnectors": [
-        "arn:aws:lambda:us-east-1:aws:network-connector:aws-network-connector:INTERNET_EGRESS"
-    ]
-}
-```
+call`).
