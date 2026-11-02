@@ -34,7 +34,7 @@ const hooks = http.createServer((req, res) => {
       hook: name,
       method: req.method,
       at: new Date().toISOString(),
-      payload: body || undefined,
+      payload: body ? JSON.parse(body) : undefined
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, hook: name }));

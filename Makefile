@@ -20,12 +20,25 @@ ENDPOINT_FILE := $(STATE_DIR)/endpoint
 REGION ?= $(AWS_REGION)
 INGRESS := arn:aws:lambda:$(REGION):aws:network-connector:aws-network-connector:ALL_INGRESS
 EGRESS  := arn:aws:lambda:$(REGION):aws:network-connector:aws-network-connector:INTERNET_EGRESS
+
+# Idle Policy configuration
+# When enabled, the idle policy controls automatic suspension and resumption.
+# The presence of traffic through the MicroVM's endpoint signals activity.
+# If no traffic arrives for the configured idle duration, the MicroVM is treated as idle and suspended.
+# NOTE: For asynchronous applications that do not actively send or receive traffic through the endpoint,
+# disable automatic suspension or configure a suitable idle duration.
+
 # Idle policy — override individual fields, or replace IDLE_POLICY wholesale.
 #   make run MAX_IDLE=60 SUSPENDED=120 AUTO_RESUME=false
 #   make run IDLE_POLICY='{"autoResumeEnabled":true,"maxIdleDurationSeconds":10,"suspendedDurationSeconds":5}'
+
+# When true, the MicroVM automatically resumes when traffic arrives at its endpoint while suspended.
 AUTO_RESUME ?= true
+# The number of seconds without traffic after which the MicroVM is suspended. Default: 15m Maximum: 28,800 (8 hours).
 MAX_IDLE    ?= 900
+# The number of seconds a MicroVM remains in the suspended state before Lambda terminates it. Default: 5m
 SUSPENDED   ?= 300
+
 IDLE_POLICY ?= {"autoResumeEnabled":$(AUTO_RESUME),"maxIdleDurationSeconds":$(MAX_IDLE),"suspendedDurationSeconds":$(SUSPENDED)}
 TOKEN_MINUTES ?= 30
 

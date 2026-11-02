@@ -161,6 +161,8 @@ the default group, so a custom group may need the policy widened).
 
 ### Lifecycle hooks
 
+Reference: [microvms-launching-lifecycle-hooks](https://docs.aws.amazon.com/lambda/latest/dg/microvms-launching.html#microvms-launching-lifecycle-hooks)
+
 The app (`app/app.js`) runs a second HTTP server on port `9000` that answers the
 MicroVM lifecycle hook paths (`/aws/lambda-microvms/runtime/v1/{ready,validate,
 run,resume,suspend,terminate}`), logs each call, and returns `200`. Hooks let the
