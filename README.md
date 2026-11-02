@@ -1,4 +1,4 @@
-# microvm-dev
+# lambda-microvm-dev
 
 A workspace to experiment with AWS Lambda MicroVMs — Firecracker-isolated,
 snapshot-resumable compute environments that run a container inside a microVM.
