@@ -72,9 +72,10 @@ convention (`<namespace>-<name>-<attributes>`):
 ### Provision
 
 ```bash
-source ./activate   # loads .env and puts the `tf` wrapper on PATH
+cp .env.example .env   # then edit: set AWS_PROFILE/AWS_REGION, NAMESPACE, NAME
+source ./activate      # loads .env and puts the `tf` wrapper on PATH
 tf init
-tf apply            # creates the bucket, build role, execution role, image
+tf apply               # creates the bucket, build role, execution role, image
 ```
 
 > `tf` is a thin wrapper (on PATH after `source ./activate`) that runs
@@ -97,11 +98,13 @@ tf apply            # creates the bucket, build role, execution role, image
 
 ## Using the Makefile
 
-A `Makefile` at the repo root wraps the whole workflow. Load the environment
-first (`source activate` reads `.env`: `AWS_PROFILE`, `AWS_REGION`, the
-`TF_VAR_*` values), then drive everything with `make`:
+A `Makefile` at the repo root wraps the whole workflow. Copy `.env.example` to
+`.env` and fill it in, then load the environment (`source activate` reads
+`.env`: `AWS_PROFILE`, `AWS_REGION`, the `TF_VAR_*` values) and drive everything
+with `make`:
 
 ```bash
+cp .env.example .env # first time only: set AWS_PROFILE/AWS_REGION, NAMESPACE, NAME
 source activate      # sets AWS_PROFILE / AWS_REGION / TF_VAR_* from .env
 make help            # list all targets
 
